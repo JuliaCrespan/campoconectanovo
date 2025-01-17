@@ -354,16 +354,12 @@
     });
 
     // Função de logout
-    document.getElementById('logoutButton').addEventListener('click', async () => {
-        try {
-            await signOut(auth);
-            alert('Você saiu!');
-            document.getElementById('feedContainer').classList.add('hidden');
-            document.getElementById('authContainer').classList.remove('hidden');
-        } catch (error) {
-            alert('Erro ao sair: ' + error.message);
-        }
-    });
+    async function logout() {
+        await signOut(auth);
+        alert('Você saiu!');
+        document.getElementById('feedContainer').classList.add('hidden');
+        document.getElementById('authContainer').classList.remove('hidden');
+    }
 
     // Função de perfil
     document.getElementById('profileButton').addEventListener('click', async () => {
