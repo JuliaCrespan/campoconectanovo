@@ -279,13 +279,13 @@
 
             const notificationRef = doc(db, "users", postOwnerId);
             await updateDoc(notificationRef, {
-                notifications: arrayUnion({
-                    type: 'interest',
-                    from: user.uid,
-                    postId: postId,
-                    timestamp: serverTimestamp()
-                })
-            });
+    notifications: arrayUnion({
+        type: 'interest',
+        from: user.uid,
+        postId: postId,
+        timestamp: new Date().toISOString() // Substitui serverTimestamp() por um timestamp manual
+    })
+});
 
             alert('Interesse declarado com sucesso!');
         } catch (error) {
