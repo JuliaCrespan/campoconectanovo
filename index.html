@@ -36,7 +36,7 @@
             text-align: center;
         }
 
-        h2 {
+        h2, h3 {
             font-size: 24px;
             color: #333;
             margin-bottom: 20px;
@@ -44,7 +44,6 @@
 
         label {
             display: block;
-            text-align: left;
             margin-bottom: 5px;
             font-weight: 600;
             color: #0066cc;
@@ -93,14 +92,7 @@
             border-radius: 12px;
             margin: 10px 0;
             padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .post-section {
-            margin-bottom: 40px;
         }
 
         .profile-button {
@@ -119,27 +111,6 @@
         .profile-button:hover {
             background-color: #004da3;
             transform: scale(1.05);
-        }
-
-        .post-content {
-            font-size: 16px;
-            line-height: 1.6;
-        }
-
-        .post-author {
-            font-size: 14px;
-            color: #555;
-        }
-
-        .timestamp {
-            font-size: 12px;
-            color: #777;
-        }
-
-        .post-meta {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
 
         a {
@@ -173,6 +144,8 @@
         </select>
         <label for="emailRegister">Email:</label>
         <input type="email" id="emailRegister" placeholder="Digite seu email" required>
+        <label for="phoneNumber">Telefone:</label>
+        <input type='text' id="phoneNumber" placeholder="Digite seu número de telefone" required>
         <label for="passwordRegister">Senha:</label>
         <input type="password" id="passwordRegister" placeholder="Digite sua senha" required>
         <button type="button" id="registerButton">Registrar</button>
@@ -182,26 +155,36 @@
 </div>
 
 <div class="container hidden" id="feedContainer">
-    <h1>Bem-vindo ao Feed</h1>
+    <h1 id="feedTitle">Bem-vindo ao Feed</h1> <!-- Adicionei o id="feedTitle" aqui -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <button class="profile-button" id="profileButton">Meu Perfil</button>
         <button class="profile-button" onclick="logout()">Sair</button>
     </div>
-    <p id="feedTitle"></p>
-
     <div class="post-section">
         <h3>Criar uma postagem:</h3>
         <textarea id="postContent" placeholder="Digite o que deseja postar..."></textarea>
         <button id="postButton">Postar</button>
     </div>
-
     <h3>Postagens:</h3>
     <ul id="postList"></ul>
 </div>
+
+<div class="container hidden" id="profileContainer">
+    <h1>Perfil</h1>
+    <p><strong>Email:</strong> <span id="profileEmail">Carregando...</span></p>
+    <p><strong>Tipo:</strong> <span id="profileUserType">Carregando...</span></p>
+    <p><strong>Telefone:</strong> <span id="profilePhone">Carregando...</span></p>
+
+    <h3>Notificações:</h3>
+    <ul id="notificationsList">
+        <li>Sem notificações no momento.</li>
+    </ul>
+    <button id="returnToFeedButton">Voltar ao Feed</button>
+</div>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, serverTimestamp, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyA6MH4IiYrFBx4UtT0ijXcx5jqCwybSNlM",
@@ -217,42 +200,65 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Função para carregar postagens
-    async function loadPosts() {
+    // Função para enviar notificação via WhatsApp usando CallMeBot
+    async function sendWhatsAppNotification(message) {
+    const url = `https://api.callmebot.com/whatsapp.php?phone=+554396811736&text=${encodeURIComponent(message)}&apikey=1253447`;
+
+    try {
+        const response = await fetch(url);
+        const responseText = await response.text();
+        console.log("Resposta da API:", responseText);
+
+        if (response.ok) {
+            console.log('Notificação enviada com sucesso!');
+        } else {
+            console.error('Erro ao enviar notificação:', response.statusText);
+        }
+    } catch (error) {
+        console.error('Erro ao enviar notificação:', error.message);
+    }
+}
+
+    // Função para carregar postagens em tempo real
+    function loadPostsRealtime() {
         const postList = document.getElementById('postList');
-        postList.innerHTML = '';
+        postList.innerHTML = ''; // Limpa a lista antes de renderizar os posts novamente
 
         try {
-            const querySnapshot = await getDocs(collection(db, "posts"));
-            querySnapshot.forEach((doc) => {
-                const post = doc.data();
-                const li = document.createElement('li');
+            const postsRef = collection(db, "posts");
+            onSnapshot(postsRef, (snapshot) => {
+                console.log("Snapshot recebido:", snapshot); // Verifique se os dados estão sendo recebidos
+                postList.innerHTML = ''; // Limpa a lista antes de renderizar novamente
 
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'post-content';
-                contentDiv.textContent = post.content;
+                snapshot.forEach((doc) => {
+                    const post = doc.data();
+                    const li = document.createElement('li');
 
-                const metaDiv = document.createElement('div');
-                metaDiv.className = 'post-meta';
-                metaDiv.innerHTML = `<span class='post-author'>Por: ${post.uid}</span> <span class='timestamp'>${new Date(post.timestamp?.toDate()).toLocaleString()}</span>`;
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'post-content';
+                    contentDiv.textContent = post.content;
 
-                const interestButton = document.createElement('button');
-                interestButton.textContent = 'Demonstrar Interesse';
-                interestButton.className = 'interest-button';
-                interestButton.addEventListener('click', () => declareInterest(doc.id, post.uid));
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'post-meta';
+                    metaDiv.innerHTML = `<span class='post-author'>Por: ${post.uid}</span> <span class='timestamp'>${new Date(post.timestamp?.toDate()).toLocaleString()}</span>`;
 
-                li.appendChild(contentDiv);
-                li.appendChild(metaDiv);
-                li.appendChild(interestButton);
+                    const interestButton = document.createElement('button');
+                    interestButton.textContent = 'Demonstrar Interesse';
+                    interestButton.className = 'interest-button';
+                    interestButton.addEventListener('click', () => declareInterest(doc.id, post.uid));
 
-                postList.appendChild(li);
+                    li.appendChild(contentDiv);
+                    li.appendChild(metaDiv);
+                    li.appendChild(interestButton);
+
+                    postList.appendChild(li);
+                });
             });
         } catch (error) {
             alert('Erro ao carregar postagens: ' + error.message);
         }
     }
-
-    // Função para declarar interesse
+//função declarar interesse
     async function declareInterest(postId, postOwnerId) {
         const user = auth.currentUser;
         if (!user) {
@@ -266,26 +272,43 @@
         }
 
         try {
+            // Carrega os dados do post
             const postRef = doc(db, "posts", postId);
-            const postSnapshot = await getDoc(postRef);
-            if (!postSnapshot.exists()) {
-                alert('Postagem não encontrada.');
-                return;
-            }
+            const postDoc = await getDoc(postRef);
+            const postContent = postDoc.data().content;
 
+            // Carrega os dados do usuário
+            const userRef = doc(db, "users", user.uid);
+            const userDoc = await getDoc(userRef);
+            const userName = userDoc.data().name;  // Supondo que o nome do usuário esteja no campo 'name'
+            const userPhone = userDoc.data().phone;  // Supondo que o telefone esteja no campo 'phone'
+
+            // Atualiza o post para adicionar o usuário interessado
             await updateDoc(postRef, {
                 interestedUsers: arrayUnion(user.uid)
             });
 
+            // Atualiza as notificações do dono do post
             const notificationRef = doc(db, "users", postOwnerId);
             await updateDoc(notificationRef, {
-    notifications: arrayUnion({
-        type: 'interest',
-        from: user.uid,
-        postId: postId,
-        timestamp: new Date().toISOString() // Substitui serverTimestamp() por um timestamp manual
-    })
-});
+                notifications: arrayUnion({
+                    type: 'interest',
+                    from: user.uid,
+                    postId: postId,
+                    timestamp: new Date().toISOString()
+                })
+            });
+
+            // Cria a mensagem a ser enviada ao administrador via WhatsApp
+            const message = `Novo interesse em um post!\n\n` +
+                            `Usuário: ${userName}\n` +
+                            `Telefone: ${userPhone}\n` +
+                            `Post: ${postContent}\n` +
+                            `Post ID: ${postId}\n` +
+                            `Dono do Post ID: ${postOwnerId}`;
+
+            // Envia a mensagem para o administrador via CallMeBot (WhatsApp)
+            await sendWhatsAppNotification(message);
 
             alert('Interesse declarado com sucesso!');
         } catch (error) {
@@ -308,13 +331,12 @@
             await setDoc(postRef, {
                 uid: user.uid,
                 content: postContent,
-                timestamp: serverTimestamp(),
+                timestamp: new Date(),
                 interestedUsers: []
             });
 
             alert('Postagem criada com sucesso!');
             document.getElementById('postContent').value = '';
-            loadPosts();
         } catch (error) {
             alert('Erro ao criar postagem: ' + error.message);
         }
@@ -329,7 +351,7 @@
         const oppositeType = userType === "produtor" ? "comprador" : "produtor";
         feedTitle.textContent = `Recomendações de ${oppositeType}s:`;
 
-        await loadPosts();
+        loadPostsRealtime();
     }
 
     // Função de login
@@ -369,23 +391,43 @@
             return;
         }
 
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-            const userData = userDoc.data();
-            const notifications = userData.notifications || [];
+        try {
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
 
-            let profileContent = `Perfil:\nEmail: ${userData.email}\nTipo: ${userData.userType}\n\nNotificações:\n`;
-            notifications.forEach((notif, index) => {
-                profileContent += `${index + 1}. Interesse no post ${notif.postId} por ${notif.from}\n`;
-            });
+                // Atualiza informações do perfil
+                document.getElementById('profileEmail').innerText = userData.email || 'Não informado';
+                document.getElementById('profileUserType').innerText = userData.userType || 'Não especificado';
+                document.getElementById('profilePhone').innerText = userData.phone || 'Não informado';
 
-            alert(profileContent);
-        } else {
-            alert('Perfil não encontrado.');
+                // Atualiza notificações
+                const notificationsList = document.getElementById('notificationsList');
+                notificationsList.innerHTML = ''; // Limpa as notificações anteriores
+                const notifications = userData.notifications || [];
+                if (notifications.length > 0) {
+                    notifications.forEach((notif, index) => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `<strong>Notificação ${index + 1}:</strong> Interesse no post ${notif.postId} por ${notif.from}`;
+                        notificationsList.appendChild(li);
+                    });
+                } else {
+                    notificationsList.innerHTML = '<li>Sem notificações.</li>';
+                }
+
+                // Redireciona para a página de perfil
+                document.getElementById('feedContainer').classList.add('hidden');
+                document.getElementById('profileContainer').classList.remove('hidden');
+            } else {
+                alert('Perfil não encontrado.');
+            }
+        } catch (error) {
+            console.error('Erro ao buscar o perfil:', error);
+            alert('Ocorreu um erro ao carregar o perfil.');
         }
     });
 
-    // Função de alternar entre login e registro
+    // Alternar entre login e registro
     window.toggleForms = function toggleForms() {
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
@@ -401,12 +443,20 @@
             toggleLink.innerHTML = "Já tem uma conta? <a href='#'>Faça login aqui</a>";
         }
     };
+// Função para retornar ao feed
+function returnToFeed() {
+    document.getElementById('profileContainer').classList.add('hidden');
+    document.getElementById('feedContainer').classList.remove('hidden');
+    document.getElementById('returnToFeedButton').addEventListener('click', returnToFeed);
 
-    // Função para o botão de registro
+}
+
+    // Função para registro
     document.getElementById('registerButton').addEventListener('click', async () => {
         const email = document.getElementById('emailRegister').value;
         const password = document.getElementById('passwordRegister').value;
         const userType = document.getElementById('userType').value;
+        const phoneNumber = document.getElementById('phoneNumber').value;
 
         if (!email || !password) {
             alert('Por favor, preencha todos os campos.');
@@ -417,11 +467,11 @@
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            // Registra o usuário no Firestore
             await setDoc(doc(db, "users", user.uid), {
                 email: email,
                 userType: userType,
-                notifications: [] // Inicializa o array de notificações
+                phone: phoneNumber,
+                notifications: []
             });
 
             alert('Conta criada com sucesso!');
