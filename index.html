@@ -437,7 +437,7 @@ document.getElementById('registerButton').addEventListener('click', async functi
         await updateDoc(ownerRef, {
     notifications: arrayUnion({
         type: "interest",
-        from: `Nome: ${userName}, Telefone: ${userPhone}`,
+        from: `Nome: ${userName}`,
         postId: postId,
         timestamp: new Date().toISOString()
     })
