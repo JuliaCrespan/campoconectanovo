@@ -378,6 +378,21 @@ async function renderPost(post, postId) {
 
     const metaDiv = document.createElement('div');
     metaDiv.className = 'post-meta';
+      // Adiciona a data de entrega ao post, se existir
+    if (post.dataEntrega) {
+        const dataEntregaDiv = document.createElement('div');
+        dataEntregaDiv.className = 'post-data';
+        dataEntregaDiv.textContent = `Data prevista: ${post.dataEntrega}`;
+        li.appendChild(dataEntregaDiv);
+    }
+
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'post-meta';
+
+    li.appendChild(contentDiv);
+    li.appendChild(metaDiv);
+    postList.appendChild(li);
+}
 
     // Carregar o nome do autor da postagem
     try {
