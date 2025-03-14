@@ -160,10 +160,21 @@
                 <input type="email" id="emailRegister" placeholder="Digite seu email" required>
                 <label for="name">Nome completo:</label>
                 <input type="text" id="name" placeholder="Digite seu nome completo" required>
+                <label for="nomePropriedade">Nome da Propriedade ou Comércio:</label>
+                <input type="text" id ="nomePropriedade" placeholder="Digite o nome da sua propriedade ou de seu comércio" required>
                  <label for="cidade">Cidade:</label>
                 <input type="text" id ="cidade" placeholder="Digite o nome da sua cidade" required>
                  <label for="estado">Estado:</label>
-                <input type="text" id ="Estado" placeholder="Digite o nome do seu estado" required>
+                <input type="text" id ="estado" placeholder="Digite o nome do seu estado" required>
+                <h5>Qual categoria você tem interesse em comprar ou vender?</h5>
+                <select id="categoriaFornece">
+                <option value="hortifruti">Hortifruti Convencional</option>
+                <option value="outros">Todos</option>
+                <option value="hortifutiorganico">Hortifruti Orgânico</option>
+                <option value="opçaodiferenciada"> Produto diferenciado do agro</option>
+                <option value="opçaodiferenciadaeconv"> Produto diferenciado do agro e hortifruti convencional</option>
+                <option value="opçaodiferenciadaeorganico"> Produto diferenciado do agro e hortifruti orgânico</option>
+            </select>
                 <label for="phoneNumber">Telefone:</label>
                 <input type="text" id="phoneNumber" placeholder="Digite seu número de telefone" required>
                 <label for="passwordRegister">Senha:</label>
@@ -172,7 +183,11 @@
                     <label for="cnhImage">Envie uma foto da sua CNH:</label>
                     <input type="file" id="cnhImage" accept="image/*" required>
                 </div>
-                <button type="button" id="registerButton">Registrar</button>
+                <div id="docsField" style="display: none;">
+                    <label for="docsImage">Envie uma foto dos documentos de seu veículo:</label>
+                    <input type="file" id="docsImage" accept="image/*" required>
+                </div>
+                <button type="submit" id="registerButton">Registrar</button>
             </form>
     
             <p id="toggleAuth">Ainda não tem uma conta? <a href="#" onclick="toggleForms()">Registre-se aqui</a></p>
@@ -189,6 +204,8 @@
                 <h3>Criar uma postagem:</h3>
                 <textarea id="postContent" placeholder="Digite o que deseja postar..."></textarea>
                 <input type="file" id="imageUpload" accept="image/*">
+                <h4>Insira a data prevista para compra ou entrega</h4>
+                <input type="date" id="dataEntrega">
                 <button id="postButton">Postar</button>
             </div>
             <h3>Postagens:</h3>
@@ -207,9 +224,9 @@
             <p><strong>Email:</strong> <span id="profileEmail">Carregando...</span></p>
             <p><strong>Tipo:</strong> <span id="profileUserType">Carregando...</span></p>
             <p><strong>Telefone:</strong> <span id="profilePhone">Carregando...</span></p>
-            <p><strong>Cidade:</strong> <span id="profileCidade">Carregando...</span></p>7
-             <p><strong>Estado:</strong> <span id="profileEsTADO">Carregando...</span></p>
-    
+            <p><strong>Cidade:</strong> <span id="profileCidade">Carregando...</span></p>
+             <p><strong>Estado:</strong> <span id="profileEstado">Carregando...</span></p>
+             <p><strong>Propriedade ou Comércio:</strong> <span id="profilePropriedade">Carregando...</span></p>
             <h3>Notificações:</h3>
             <ul id="notificationsList">
                 <li>Sem notificações no momento.</li>
@@ -362,30 +379,91 @@ document.getElementById('userType').addEventListener('change', function() {
     } else {
         cnhField.style.display = 'none';
     }
-});
-
-// Função para enviar a imagem para o banco de dados
-document.getElementById('registerButton').addEventListener('click', async function() {
-    var userType = document.getElementById('userType').value;
-    
     if (userType === 'fretista') {
-        var cnhImage = document.getElementById('cnhImage').files[0];
-        
-        if (!cnhImage) {
-            alert('Por favor, envie a foto da sua CNH.');
-            return;
-        }
-        
-        // Aqui você pode fazer o upload da imagem para o banco de dados
-        // Vamos supor que você use o Firebase Storage, por exemplo:
-        const storageRef = firebase.storage().ref('cnhs/' + cnhImage.name);
-        await storageRef.put(cnhImage);
-        
-        alert('Imagem da CNH enviada com sucesso!');
+docsField.style.display = 'block';
+    } else {
+        docsImage.style.display = 'none';
+    }
+    }
+);
+
+// Enviar formulário
+
+document.getElementById('registerForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+
+    const userType = document.getElementById('userType').value;
+    if (userType !== 'fretista') {
+        alert('Registro concluído (não é fretista).');
+        return;
     }
 
-    // Você pode adicionar o restante do código para salvar os outros dados no banco de dados
+    const cnhImage = document.getElementById('cnhImage').files[0];
+    const docsImage = document.getElementById('docsImage').files[0];
+
+    if (!cnhImage || !docsImage) {
+        alert('Por favor, envie a foto da sua CNH e dos documentos do veículo.');
+        return;
+    }
+
+    try {
+        const cnhBase64 = await toBase64(cnhImage);
+        const docsBase64 = await toBase64(docsImage);
+
+        const cnhUrl = await uploadToImgur(cnhBase64);
+        const docsUrl = await uploadToImgur(docsBase64);
+        await sendWhatsAppMessage(cnhUrl, docsUrl);
+        alert('Documentos enviados pelo WhatsApp com sucesso!');
+    } catch (error) {
+        console.error('Erro ao enviar documentos:', error);
+        alert('Erro ao enviar documentos. Tente novamente.');
+    }
 });
+
+// Converter imagem para Base64
+async function toBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(',')[1]); // Remove o prefixo data:image/png;base64,
+        reader.onerror = error => reject(error);
+    });
+}
+
+async function uploadToImgur(base64Image) {
+    const clientId = "7ca37214bb68351"; // Substitua pelo seu Client ID do Imgur
+    const formData = new FormData();
+    formData.append("image", base64Image);
+
+    const response = await fetch("https://api.imgur.com/3/image", {
+        method: "POST",
+        headers: {
+            Authorization: `Client-ID ${clientId}`,
+        },
+        body: formData,
+    });
+
+    const data = await response.json();
+    if (data.success) {
+        return data.data.link;
+    } else {
+        throw new Error("Erro ao fazer upload para o Imgur");
+    }
+}
+
+async function sendWhatsAppMessage(cnhUrl, docsUrl) {
+    const phone = "+554396811736"; // Substitua pelo número correto
+    const apikey = "1253447"; // Substitua pela chave correta da API do CallMeBot
+    const message = `Nova CNH e documentos enviados:\n\nCNH: ${cnhUrl}\n\nDocumentos: ${docsUrl}`;
+    
+    const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(message)}&apikey=${apikey}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+        throw new Error("Erro ao enviar mensagem pelo WhatsApp");
+    }
+}
+
     // Função para declarar interesse
     async function declareInterest(postId, postOwnerId) {
     const user = auth.currentUser;
@@ -420,6 +498,8 @@ document.getElementById('registerButton').addEventListener('click', async functi
 
         const userName = userDoc.data().name;
         const userPhone = userDoc.data().phone || "Telefone não informado";
+        const userPropriedade = userDoc.data().nomePropriedade || "Propriedade não informada"
+        const userType = userDoc.data().userType
 
         // Buscar dados do dono do post
         const ownerRef = doc(db, "users", postOwnerId);
@@ -450,7 +530,7 @@ document.getElementById('registerButton').addEventListener('click', async functi
 });
 
         // Criar a mensagem para enviar via WhatsApp
-        const message = `🚀 Alguém se interessou em um post!\n\n👤 Nome: ${userName}\n📞 Tipo de usuário: ${userType}\n Contato: ${userPhone}\n📌 Post: ${postContent}`;
+        const message = `🚀 Alguém se interessou em um post!\n\n👤 Nome: ${userName}\n📞 Tipo de usuário: ${userType}\n Contato: ${userPhone}\n📌 Post: ${postContent}\n  👤Nome da propriedade ou comércio: ${userPropriedade}\n`;
 
         // Enviar mensagem pelo WhatsApp usando CallMeBot
         await sendWhatsAppNotification(ownerPhone, message);
@@ -594,13 +674,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const userDoc = await getDoc(doc(db, "users", user.uid));
             if (userDoc.exists()) {
                 const userData = userDoc.data();
-
+               
                 // Atualiza informações do perfil
                 document.getElementById('profileEmail').innerText = userData.email || 'Não informado';
                 document.getElementById('profileUserType').innerText = userData.userType || 'Não especificado';
                 document.getElementById('profilePhone').innerText = userData.phone || 'Não informado';
-                document.getElementById('profileCidadee').innerText = userData.cidade || 'Não informado';
-                document.getElementById('profileEstado').innerText = userData.Estado || 'Não informado';
+                document.getElementById('profileCidade').innerText = userData.cidade || 'Não informado';
+                document.getElementById('profileEstado').innerText = userData.estado || 'Não informado';
+                document.getElementById('profilePropriedade').innerText = userData.nomePropriedade || 'Não informado';
 
                 // Atualiza notificações
                 const notificationsList = document.getElementById('notificationsList');
@@ -660,6 +741,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const userType = document.getElementById('userType').value;
         const phoneNumber = document.getElementById('phoneNumber').value;
         const name = document.getElementById('name').value;  // Captura o nome do usuário
+        const cidade = document.getElementById('cidade').value;
+        const estado = document.getElementById('estado').value;
+        const nomePropriedade = document.getElementById('nomePropriedade').value;
 
         if (!email || !password) {
             alert('Por favor, preencha todos os campos.');
@@ -675,6 +759,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 userType: userType,
                 phone: phoneNumber,
                 name: name,
+                cidade: cidade, // Certifique-se de que está sendo salvo
+                estado: estado,
+                nomePropriedade: nomePropriedade, // Certifique-se de que está sendo salvo
                 notifications: []
             });
 
