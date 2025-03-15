@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campo Conecta</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+               @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
 body {
     margin: 0;
@@ -97,6 +97,15 @@ li {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
+/* 🔹 Ajuste para imagens dentro de postagens */
+li img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+    display: block;
+    margin: 10px auto;
+}
+
 .profile-button {
     background-color: #0066cc;
     border: none;
@@ -126,11 +135,15 @@ a:hover {
 /* 🔹 RESPONSIVIDADE */
 @media (max-width: 600px) {
     .container {
-        padding: 25px;
+        padding: 20px;
     }
 
     h1 {
         font-size: 24px;
+    }
+
+    h2, h3 {
+        font-size: 18px;
     }
 
     input, select, textarea {
@@ -142,7 +155,30 @@ a:hover {
         padding: 10px;
         font-size: 14px;
     }
+
+    li {
+        padding: 15px;
+        font-size: 14px;
+    }
 }
+
+/* 🔹 RESPONSIVIDADE EXTRA PARA TELAS MUITO PEQUENAS (ex: 360px) */
+@media (max-width: 400px) {
+    h1 {
+        font-size: 20px;
+    }
+
+    button, .start-chat-button {
+        padding: 8px;
+        font-size: 14px;
+    }
+
+    input, select, textarea {
+        font-size: 14px;
+    }
+}
+
+
 
 
     </style>
