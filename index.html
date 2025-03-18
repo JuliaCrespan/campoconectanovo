@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campo Conecta</title>
     <style>
-               @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+       @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
 body {
     margin: 0;
@@ -177,7 +177,6 @@ a:hover {
         font-size: 14px;
     }
 }
-
 
 
 
@@ -961,6 +960,13 @@ document.addEventListener('DOMContentLoaded', function () {
 // Variável global para armazenar o ID do chat ativo
 let activeChatId = null;
 
+// Função para buscar nomes dos usuários pelo ID
+async function getUserName(userId) {
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+    return userSnap.exists() ? userSnap.data().name : "Usuário Desconhecido";
+}
+
 // Função para iniciar o chat
 async function startChat(postId, postOwnerId) {
     const user = auth.currentUser;
@@ -972,34 +978,30 @@ async function startChat(postId, postOwnerId) {
     const userId = user.uid;
 
     try {
-        // Verifica se já existe um chat entre esses usuários para o mesmo post
         const chatsRef = collection(db, "chats");
         const q = query(
             chatsRef,
-            where("users", "array-contains", userId), // Verifica se o usuário atual está no chat
-            where("postId", "==", postId) // Verifica se o chat é para o mesmo post
+            where("users", "array-contains", userId),
+            where("postId", "==", postId)
         );
         const querySnapshot = await getDocs(q);
 
         let chatId = null;
-
-        // Se já existir um chat, usa o ID desse chat
         if (!querySnapshot.empty) {
             querySnapshot.forEach((doc) => {
                 const chatData = doc.data();
-                if (chatData.users.includes(postOwnerId)) { // Verifica se o dono do post está no chat
+                if (chatData.users.includes(postOwnerId)) {
                     chatId = doc.id;
                 }
             });
         }
 
-        // Se não existir um chat, cria um novo
         if (!chatId) {
             const chatRef = await addDoc(collection(db, "chats"), {
-                users: [userId, postOwnerId], // IDs dos participantes
-                messages: [], // Array de mensagens vazio
-                createdAt: new Date().toISOString(), // Data de criação
-                postId: postId // ID do post relacionado
+                users: [userId, postOwnerId],
+                messages: [],
+                createdAt: new Date().toISOString(),
+                postId: postId
             });
             chatId = chatRef.id;
             console.log("Novo chat criado com ID:", chatId);
@@ -1007,13 +1009,9 @@ async function startChat(postId, postOwnerId) {
             console.log("Chat existente encontrado com ID:", chatId);
         }
 
-        // Atualiza o ID do chat ativo
         activeChatId = chatId;
-
-        // Redireciona para a tela de chat
         openChat(activeChatId);
 
-        // Adiciona uma notificação para o dono do post (se o usuário atual não for o dono do post)
         if (userId !== postOwnerId) {
             await addNotification(chatId, userId, postOwnerId, postId);
         }
@@ -1026,34 +1024,30 @@ async function startChat(postId, postOwnerId) {
 // Função para abrir o chat
 function openChat(chatId) {
     console.log("Abrindo chat com ID:", chatId);
-
-    // Oculta o feed e exibe a interface de chat
     document.getElementById('feedContainer').classList.add('hidden');
     document.getElementById('chatContainer').classList.remove('hidden');
-
-    // Atualiza o ID do chat ativo
     activeChatId = chatId;
-
-    // Carrega as mensagens do chat
     loadChatMessages(chatId);
 }
 
-// Função para carregar mensagens do chat
-function loadChatMessages(chatId) {
+// Função para carregar mensagens do chat com nomes dos usuários
+async function loadChatMessages(chatId) {
     const messagesRef = collection(db, "chats", chatId, "messages");
     const messagesContainer = document.getElementById('messages');
-
-    // Limpa as mensagens anteriores
     messagesContainer.innerHTML = '';
-
-    // Escuta por novas mensagens em tempo real
-    onSnapshot(messagesRef, (snapshot) => {
-        snapshot.forEach((doc) => {
+    
+    const usersMap = {};
+    onSnapshot(messagesRef, async (snapshot) => {
+        messagesContainer.innerHTML = '';
+        for (const doc of snapshot.docs) {
             const message = doc.data();
+            if (!usersMap[message.sender]) {
+                usersMap[message.sender] = await getUserName(message.sender);
+            }
             const messageElement = document.createElement('div');
-            messageElement.textContent = `${message.sender}: ${message.text}`;
+            messageElement.textContent = `${usersMap[message.sender]}: ${message.text}`;
             messagesContainer.appendChild(messageElement);
-        });
+        }
     });
 }
 
@@ -1061,52 +1055,29 @@ function loadChatMessages(chatId) {
 async function sendMessage(chatId) {
     const messageInput = document.getElementById('messageInput');
     const messageText = messageInput.value.trim();
-
     if (messageText) {
         const user = auth.currentUser;
         if (!user) {
             alert("Você precisa estar logado para enviar mensagens.");
             return;
         }
-
         try {
-            // Adiciona a mensagem ao Firestore
             await addDoc(collection(db, "chats", chatId, "messages"), {
                 sender: user.uid,
                 text: messageText,
                 createdAt: new Date().toISOString()
             });
-
             console.log("Mensagem enviada com sucesso!");
             messageInput.value = '';
-
-            // Adiciona uma notificação para o outro usuário
-            const chatRef = doc(db, "chats", chatId);
-            const chatDoc = await getDoc(chatRef);
-
-            if (chatDoc.exists()) {
-                const chatData = chatDoc.data();
-                const users = chatData.users; // IDs dos participantes do chat
-
-                // Encontra o ID do outro usuário (não o remetente)
-                const otherUserId = users.find((userId) => userId !== user.uid);
-
-                if (otherUserId) {
-                    await addNotificationint(chatId, user.uid, otherUserId, chatData.postId);
-                }
-            }
-
-            // Atualiza as notificações na interface
-            loadNotificationsint();
         } catch (error) {
             console.error("Erro ao enviar mensagem:", error);
-            alert("Ocorreu um erro ao tentar enviar a mensagem. Tente novamente.");
         }
     }
 }
 
+    
 // Função para adicionar notificação
-async function addNotificationint(chatId, senderId, receiverId, postId) {
+async function addNotification(chatId, senderId, receiverId, postId) {
     try {
         // Busca os dados do usuário remetente (quem enviou a mensagem)
         const senderRef = doc(db, "users", senderId);
@@ -1138,7 +1109,7 @@ async function addNotificationint(chatId, senderId, receiverId, postId) {
     }
 }
 
-function loadNotificationsint() {
+function loadNotifications() {
     const user = auth.currentUser;
     if (!user) {
         console.log("❌ Usuário não autenticado.");
