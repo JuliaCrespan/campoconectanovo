@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -755,22 +754,25 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('Ocorreu um erro ao carregar o perfil.');
         }
     });
-    // Alternar entre login e registro
-    window.toggleForms = function toggleForms() {
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
-        const toggleLink = document.getElementById('toggleAuth');
+   // Alternar entre login e registro
+window.toggleForms = function toggleForms(event) {
+    if (event) event.preventDefault(); // Evita recarregar a página
 
-        if (loginForm.classList.contains('hidden')) {
-            loginForm.classList.remove('hidden');
-            registerForm.classList.add('hidden');
-            toggleLink.innerHTML = "Ainda não tem uma conta? <a href='#'>Registre-se aqui</a>";
-        } else {
-            loginForm.classList.add('hidden');
-            registerForm.classList.remove('hidden');
-            toggleLink.innerHTML = "Já tem uma conta? <a href='#'>Faça login aqui</a>";
-        }
-    };
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const toggleLink = document.getElementById('toggleAuth');
+
+    if (loginForm.classList.contains('hidden')) {
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+        toggleLink.innerHTML = 'Ainda não tem uma conta? <a href="#" onclick="toggleForms(event)">Registre-se aqui</a>';
+    } else {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        toggleLink.innerHTML = 'Já tem uma conta? <a href="#" onclick="toggleForms(event)">Faça login aqui</a>';
+    }
+};
+
 // Função para retornar ao feed
 function returnToFeed() {
     document.getElementById('profileContainer').classList.add('hidden'); // Oculta o perfil
@@ -1008,7 +1010,13 @@ async function startChat(postId, postOwnerId) {
         } else {
             console.log("Chat existente encontrado com ID:", chatId);
         }
-
+// Notifica o dono do post apenas se um novo chat for criado
+if (userId !== postOwnerId) {
+                await addNotification(chatId, userId, postOwnerId, postId);
+            }
+         else {
+            console.log("Chat existente encontrado com ID:", chatId);
+        }
         activeChatId = chatId;
         openChat(activeChatId);
 
@@ -1079,7 +1087,6 @@ async function sendMessage(chatId) {
 // Função para adicionar notificação
 async function addNotification(chatId, senderId, receiverId, postId) {
     try {
-        // Busca os dados do usuário remetente (quem enviou a mensagem)
         const senderRef = doc(db, "users", senderId);
         const senderDoc = await getDoc(senderRef);
 
@@ -1088,63 +1095,26 @@ async function addNotification(chatId, senderId, receiverId, postId) {
             const userName = senderData.name || "Usuário";
             const userPhone = senderData.phone || "N/A";
 
-            // Adiciona a notificação ao documento do destinatário
+            const notification = {
+                type: "message_received", // 🔥 Alterado para diferenciar de "interest"
+                message: `📩 Nova mensagem de ${userName} (${userPhone})!`,
+                chatId: chatId,
+                postId: postId,
+                timestamp: new Date().toISOString()
+            };
+
             const receiverRef = doc(db, "users", receiverId);
             await updateDoc(receiverRef, {
-                notifications: arrayUnion({
-                    type: "new_message",
-                    message: `Você recebeu uma nova mensagem de ${userName} (${userPhone}).`,
-                    chatId: chatId,
-                    postId: postId,
-                    timestamp: new Date().toISOString()
-                })
+                notifications: arrayUnion(notification)
             });
 
-            console.log("Notificação adicionada para o usuário:", receiverId);
+            console.log("✅ Notificação de MENSAGEM adicionada:", notification);
         } else {
-            console.error("Dados do remetente não encontrados.");
+            console.error("⚠️ Dados do remetente não encontrados.");
         }
     } catch (error) {
-        console.error("Erro ao adicionar notificação:", error);
+        console.error("🔥 Erro ao adicionar notificação de mensagem:", error);
     }
-}
-
-function loadNotifications() {
-    const user = auth.currentUser;
-    if (!user) {
-        console.log("❌ Usuário não autenticado.");
-        return;
-    }
-
-    const userRef = doc(db, "users", user.uid);
-
-    onSnapshot(userRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const userData = docSnap.data();
-            console.log("🔍 Dados do usuário (tempo real):", userData);
-
-            const notifications = userData.notifications || [];
-            console.log("📩 Notificações carregadas (tempo real):", notifications);
-
-            const notificationsList = document.getElementById('notificationsList');
-            notificationsList.innerHTML = '';
-
-            if (notifications.length === 0) {
-                notificationsList.innerHTML = "<li>📭 Nenhuma notificação</li>";
-                return;
-            }
-
-            notifications.forEach((notif) => {
-                const li = document.createElement('li');
-                li.textContent = notif.message;
-                notificationsList.appendChild(li);
-            });
-        } else {
-            console.log("⚠️ Documento do usuário não encontrado!");
-        }
-    }, (error) => {
-        console.error("🔥 Erro ao carregar notificações em tempo real:", error);
-    });
 }
 
 
@@ -1200,12 +1170,7 @@ document.addEventListener('DOMContentLoaded', function () {
             let listaFretistas = "";
             if (respostaFrete) {
                 const fretistas = await buscarFretistasDisponiveis();
-                if (fretistas.length > 0) {
-                    listaFretistas = fretistas.join("\n");
-                    alert(`🚚 *Fretistas disponíveis:*\n\n${listaFretistas}`);
-                } else {
-                    alert("Nenhum fretista disponível no momento.");
-                }
+            
             }
 
             // Notifica o ADM sobre a resposta
